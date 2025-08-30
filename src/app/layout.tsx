@@ -13,11 +13,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ko">
-      <body className="antialiased bg-gray-50">
-        <main className="pb-20">
-          {children}
-        </main>
+    <html lang="ko" suppressHydrationWarning>
+      <body className="antialiased bg-gray-50" suppressHydrationWarning>
+        <main className="pb-20">{children}</main>
         <BottomNavigationBar />
       </body>
     </html>
