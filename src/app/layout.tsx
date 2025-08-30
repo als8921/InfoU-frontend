@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import NavigationBar from "@/components/navigation/NavigationBar";
 
 export const metadata: Metadata = {
   title: "InfoU - 맞춤형 학습 플랫폼",
@@ -13,7 +14,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
-      <body className="antialiased">{children}</body>
+      <body className="antialiased bg-gray-50">
+        <NavigationBar />
+        <main className="pt-16">
+          {children}
+        </main>
+      </body>
     </html>
   );
 }
