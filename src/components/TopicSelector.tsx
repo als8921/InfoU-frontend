@@ -3,22 +3,19 @@
 import React, { useState, useEffect, useMemo } from "react";
 import {
   MainTopicResponse,
-  CuratedSubTopicWithRelations,
-  LevelWithStats,
+  SubTopicResponse,
 } from "../types/api";
 import { topicsService } from "../services/topics";
 
 interface TopicSelectorProps {
-  selectedLevel: LevelWithStats;
   onTopicSelect: (topic: MainTopicResponse) => void;
-  onSubTopicSelect: (subTopic: CuratedSubTopicWithRelations) => void;
+  onSubTopicSelect: (subTopic: SubTopicResponse) => void;
   selectedTopic?: MainTopicResponse | null;
-  selectedSubTopic?: CuratedSubTopicWithRelations | null;
+  selectedSubTopic?: SubTopicResponse | null;
   className?: string;
 }
 
 export const TopicSelector: React.FC<TopicSelectorProps> = ({
-  selectedLevel,
   onTopicSelect,
   onSubTopicSelect,
   selectedTopic,
@@ -26,12 +23,8 @@ export const TopicSelector: React.FC<TopicSelectorProps> = ({
   className = "",
 }) => {
   const [mainTopics, setMainTopics] = useState<MainTopicResponse[]>([]);
-  const [subTopics, setSubTopics] = useState<CuratedSubTopicWithRelations[]>(
-    []
-  );
-  const [popularSubTopics, setPopularSubTopics] = useState<
-    CuratedSubTopicWithRelations[]
-  >([]);
+  const [subTopics, setSubTopics] = useState<SubTopicResponse[]>([]);
+  const [popularSubTopics, setPopularSubTopics] = useState<SubTopicResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [subTopicsLoading, setSubTopicsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,20 +38,13 @@ export const TopicSelector: React.FC<TopicSelectorProps> = ({
       try {
         setLoading(true);
         setError(null);
-        const response = await topicsService.getMainTopics({
-          page: currentPage,
-          size: 20,
-          search: searchQuery || undefined,
-        });
-        setMainTopics(response.items);
-        setTotalPages(response.pages);
+        const response = await topicsService.getMainTopics();
+        setMainTopics(response);
+        setTotalPages(1); // 페이지네이션 제거
       } catch (err) {
-        const errorMessage =
-          err instanceof Error
-            ? err.message
-            : "주제 정보를 불러오는데 실패했습니다.";
-        setError(errorMessage);
         console.error("Failed to fetch main topics:", err);
+        const errorMessage = "백엔드 서버에 연결할 수 없습니다. 서버가 실행되고 있는지 확인해주세요.";
+        setError(errorMessage);
       } finally {
         setLoading(false);
       }
@@ -67,24 +53,7 @@ export const TopicSelector: React.FC<TopicSelectorProps> = ({
     fetchMainTopics();
   }, [currentPage, searchQuery]);
 
-  // 인기 소주제 로드 (난이도가 선택되었을 때)
-  useEffect(() => {
-    const fetchPopularSubTopics = async () => {
-      try {
-        const popular = await topicsService.getPopularCuratedSubTopics(
-          selectedLevel.code,
-          6
-        );
-        setPopularSubTopics(popular);
-      } catch (err) {
-        console.error("Failed to fetch popular sub topics:", err);
-      }
-    };
-
-    if (selectedLevel) {
-      fetchPopularSubTopics();
-    }
-  }, [selectedLevel]);
+  // 인기 소주제는 제거 (OpenAPI에 없음)
 
   // 특정 대주제의 소주제 로드
   useEffect(() => {
@@ -96,24 +65,19 @@ export const TopicSelector: React.FC<TopicSelectorProps> = ({
 
       try {
         setSubTopicsLoading(true);
-        const subs = await topicsService.getCuratedSubTopicsByMainTopic(
-          selectedTopic.id
-        );
-        // 선택된 난이도에 맞는 소주제만 필터링
-        const filteredSubs = subs.filter(
-          (sub) => sub.level_id === selectedLevel.id
-        );
-        setSubTopics(filteredSubs);
+        const subs = await topicsService.getSubTopics(selectedTopic.main_topic_id);
+        setSubTopics(subs);
       } catch (err) {
         console.error("Failed to fetch sub topics:", err);
         setSubTopics([]);
+        // 소주제 로드 실패 시 빈 배열로 설정
       } finally {
         setSubTopicsLoading(false);
       }
     };
 
     fetchSubTopics();
-  }, [selectedTopic, selectedLevel.id]);
+  }, [selectedTopic]);
 
   // 검색어 디바운싱
   const debouncedSearchQuery = useMemo(() => {
@@ -125,7 +89,7 @@ export const TopicSelector: React.FC<TopicSelectorProps> = ({
   }, [searchQuery]);
 
   const handleTopicClick = (topic: MainTopicResponse) => {
-    if (selectedTopic?.id === topic.id) {
+    if (selectedTopic?.main_topic_id === topic.main_topic_id) {
       // 같은 주제를 다시 클릭하면 선택 해제
       onTopicSelect(null as any);
     } else {
@@ -155,7 +119,7 @@ export const TopicSelector: React.FC<TopicSelectorProps> = ({
             학습 주제를 선택하세요
           </h2>
           <p className="text-gray-600">
-            {selectedLevel.name} 난이도에 맞는 주제를 찾아보세요
+            관심 있는 학습 주제를 선택해보세요
           </p>
         </div>
         <div className="flex justify-center items-center py-12">
@@ -204,10 +168,7 @@ export const TopicSelector: React.FC<TopicSelectorProps> = ({
           학습 주제를 선택하세요
         </h2>
         <p className="text-gray-600">
-          <span className="font-semibold text-blue-600">
-            {selectedLevel.name}
-          </span>{" "}
-          난이도에 맞는 주제를 찾아보세요
+          관심 있는 학습 주제를 선택해보세요
         </p>
       </div>
 
@@ -220,12 +181,12 @@ export const TopicSelector: React.FC<TopicSelectorProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {popularSubTopics.map((subTopic) => (
               <div
-                key={subTopic.id}
+                key={subTopic.sub_topic_id}
                 onClick={() => onSubTopicSelect(subTopic)}
                 className="p-4 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg cursor-pointer hover:shadow-md transition-all duration-200 hover:scale-105"
               >
                 <h4 className="font-semibold text-gray-900 mb-2">
-                  {subTopic.title}
+                  {subTopic.name}
                 </h4>
                 <p className="text-sm text-gray-600 mb-3 line-clamp-2">
                   {subTopic.description}
@@ -284,10 +245,10 @@ export const TopicSelector: React.FC<TopicSelectorProps> = ({
         <h3 className="text-lg font-semibold text-gray-900 mb-4">📚 대주제</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {mainTopics.map((topic) => {
-            const isSelected = selectedTopic?.id === topic.id;
+            const isSelected = selectedTopic?.main_topic_id === topic.main_topic_id;
             return (
               <div
-                key={topic.id}
+                key={topic.main_topic_id}
                 onClick={() => handleTopicClick(topic)}
                 className={`
                   p-4 border-2 rounded-lg cursor-pointer transition-all duration-200
@@ -304,7 +265,7 @@ export const TopicSelector: React.FC<TopicSelectorProps> = ({
                       isSelected ? "text-blue-900" : "text-gray-900"
                     }`}
                   >
-                    {topic.title}
+                    {topic.name}
                   </h4>
                   {isSelected && (
                     <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
@@ -383,7 +344,7 @@ export const TopicSelector: React.FC<TopicSelectorProps> = ({
       {selectedTopic && (
         <div className="mt-8">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">
-            🎯 {selectedTopic.title}의 세부 주제
+            🎯 {selectedTopic.name}의 세부 주제
           </h3>
 
           {subTopicsLoading ? (
@@ -396,10 +357,10 @@ export const TopicSelector: React.FC<TopicSelectorProps> = ({
           ) : subTopics.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {subTopics.map((subTopic) => {
-                const isSelected = selectedSubTopic?.id === subTopic.id;
+                const isSelected = selectedSubTopic?.sub_topic_id === subTopic.sub_topic_id;
                 return (
                   <div
-                    key={subTopic.id}
+                    key={subTopic.sub_topic_id}
                     onClick={() => onSubTopicSelect(subTopic)}
                     className={`
                       p-4 border-2 rounded-lg cursor-pointer transition-all duration-200
@@ -416,7 +377,7 @@ export const TopicSelector: React.FC<TopicSelectorProps> = ({
                           isSelected ? "text-green-900" : "text-gray-900"
                         }`}
                       >
-                        {subTopic.title}
+                        {subTopic.name}
                       </h4>
                       {isSelected && (
                         <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
@@ -468,7 +429,7 @@ export const TopicSelector: React.FC<TopicSelectorProps> = ({
                       <div className="mt-3 flex flex-wrap gap-1">
                         {subTopic.keywords.slice(0, 3).map((keyword, index) => (
                           <span
-                            key={index}
+                            key={`${subTopic.sub_topic_id}-keyword-${index}`}
                             className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded-full"
                           >
                             #{keyword}
@@ -501,8 +462,7 @@ export const TopicSelector: React.FC<TopicSelectorProps> = ({
                 />
               </svg>
               <p>
-                이 주제에 대한 {selectedLevel.name} 난이도의 세부 주제가
-                없습니다.
+                이 주제에 대한 세부 주제가 없습니다.
               </p>
               <p className="text-sm mt-1">다른 주제를 선택해보세요.</p>
             </div>

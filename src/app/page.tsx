@@ -4,31 +4,28 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { LevelSelector } from "@/components/LevelSelector";
 import { TopicSelector } from "@/components/TopicSelector";
+import { LearningPathSelector } from "@/components/LearningPathSelector";
 import {
-  LevelWithStats,
+  LevelResponse,
   MainTopicResponse,
-  CuratedSubTopicWithRelations,
+  SubTopicResponse,
+  LearningPathListResponse,
 } from "@/types/api";
 
-type Step = "welcome" | "level" | "topic" | "summary";
+type Step = "welcome" | "topic" | "learning-path" | "level" | "summary";
 
 export default function Home() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState<Step>("welcome");
-  const [selectedLevel, setSelectedLevel] = useState<LevelWithStats | null>(
-    null
-  );
-  const [selectedTopic, setSelectedTopic] = useState<MainTopicResponse | null>(
-    null
-  );
-  const [selectedSubTopic, setSelectedSubTopic] =
-    useState<CuratedSubTopicWithRelations | null>(null);
+  const [selectedLevel, setSelectedLevel] = useState<LevelResponse | null>(null);
+  const [selectedTopic, setSelectedTopic] = useState<MainTopicResponse | null>(null);
+  const [selectedSubTopic, setSelectedSubTopic] = useState<SubTopicResponse | null>(null);
+  const [selectedLearningPath, setSelectedLearningPath] = 
+    useState<LearningPathListResponse | null>(null);
 
-  const handleLevelSelect = (level: LevelWithStats) => {
+  const handleLevelSelect = (level: LevelResponse) => {
     setSelectedLevel(level);
-    setSelectedTopic(null); // 난이도 변경 시 주제 초기화
-    setSelectedSubTopic(null);
-    setCurrentStep("topic");
+    setCurrentStep("summary");
   };
 
   const handleTopicSelect = (topic: MainTopicResponse) => {
@@ -36,18 +33,23 @@ export default function Home() {
     setSelectedSubTopic(null); // 대주제 변경 시 소주제 초기화
   };
 
-  const handleSubTopicSelect = (subTopic: CuratedSubTopicWithRelations) => {
+  const handleSubTopicSelect = (subTopic: SubTopicResponse) => {
     setSelectedSubTopic(subTopic);
-    setCurrentStep("summary");
+    setCurrentStep("learning-path");
+  };
+
+  const handleLearningPathSelect = (learningPath: LearningPathListResponse) => {
+    setSelectedLearningPath(learningPath);
+    setCurrentStep("level");
   };
 
   const startLearning = () => {
-    // 선택된 정보를 바탕으로 학습 페이지로 이동
-    if (selectedSubTopic) {
-      router.push(`/read/${selectedSubTopic.id}`);
-    } else if (selectedTopic && selectedLevel) {
-      // 대주제만 선택된 경우 해당 주제의 첫 번째 소주제로 이동
-      router.push(`/read/sample`); // 임시로 sample로 이동
+    // 선택된 정보를 바탕으로 커리큘럼 페이지로 이동
+    if (selectedLearningPath && selectedLevel) {
+      router.push(`/curriculum/${selectedLearningPath.path_id}?level=${selectedLevel.level_code}`);
+    } else {
+      // 필수 정보가 없는 경우
+      alert("모든 선택을 완료해주세요.");
     }
   };
 
@@ -55,6 +57,7 @@ export default function Home() {
     setSelectedLevel(null);
     setSelectedTopic(null);
     setSelectedSubTopic(null);
+    setSelectedLearningPath(null);
     setCurrentStep("welcome");
   };
 
@@ -128,7 +131,7 @@ export default function Home() {
             </ul>
           </div>
           <button
-            onClick={goToLevelSelection}
+            onClick={() => setCurrentStep("topic")}
             className="w-full py-4 px-6 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors focus:ring-4 focus:ring-blue-200"
           >
             학습 시작하기
@@ -140,12 +143,17 @@ export default function Home() {
 
   const renderProgressBar = () => {
     const steps = [
-      { key: "level", label: "난이도 선택", completed: !!selectedLevel },
       {
         key: "topic",
         label: "주제 선택",
-        completed: !!selectedTopic || !!selectedSubTopic,
+        completed: !!selectedTopic && !!selectedSubTopic,
       },
+      {
+        key: "learning-path",
+        label: "학습 경로",
+        completed: !!selectedLearningPath,
+      },
+      { key: "level", label: "난이도 선택", completed: !!selectedLevel },
       { key: "summary", label: "학습 시작", completed: false },
     ];
 
@@ -222,20 +230,6 @@ export default function Home() {
       <div className="bg-white rounded-xl shadow-lg p-8 space-y-6">
         {/* 선택 요약 */}
         <div className="space-y-4">
-          <div className="flex items-center p-4 bg-blue-50 rounded-lg">
-            <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center mr-4">
-              <span className="text-white font-bold">
-                {selectedLevel?.order}
-              </span>
-            </div>
-            <div>
-              <h3 className="font-semibold text-gray-900">선택된 난이도</h3>
-              <p className="text-gray-600">
-                {selectedLevel?.name} - {selectedLevel?.description}
-              </p>
-            </div>
-          </div>
-
           {selectedTopic && (
             <div className="flex items-center p-4 bg-green-50 rounded-lg">
               <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center mr-4">
@@ -255,7 +249,7 @@ export default function Home() {
               </div>
               <div>
                 <h3 className="font-semibold text-gray-900">선택된 대주제</h3>
-                <p className="text-gray-600">{selectedTopic.title}</p>
+                <p className="text-gray-600">{selectedTopic.name}</p>
               </div>
             </div>
           )}
@@ -281,16 +275,57 @@ export default function Home() {
                 <h3 className="font-semibold text-gray-900">
                   선택된 세부 주제
                 </h3>
-                <p className="text-gray-600">{selectedSubTopic.title}</p>
-                {selectedSubTopic.estimated_duration_minutes && (
-                  <p className="text-sm text-gray-500 mt-1">
-                    예상 학습 시간:{" "}
-                    {selectedSubTopic.estimated_duration_minutes}분
-                  </p>
-                )}
+                <p className="text-gray-600">{selectedSubTopic.name}</p>
+                <p className="text-sm text-gray-500 mt-1">
+                  {selectedSubTopic.description}
+                </p>
               </div>
             </div>
           )}
+
+          {selectedLearningPath && (
+            <div className="flex items-center p-4 bg-indigo-50 rounded-lg">
+              <div className="w-10 h-10 bg-indigo-500 rounded-full flex items-center justify-center mr-4">
+                <svg
+                  className="w-6 h-6 text-white"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"
+                  />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-gray-900">선택된 학습 경로</h3>
+                <p className="text-gray-600">{selectedLearningPath.title}</p>
+                <div className="flex items-center mt-1 text-sm text-gray-500">
+                  <span className="mr-4">
+                    커리큘럼 {selectedLearningPath.curriculum_count}개
+                  </span>
+                  <span>예상 시간 {selectedLearningPath.estimated_hours}시간</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center p-4 bg-blue-50 rounded-lg">
+            <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center mr-4">
+              <span className="text-white font-bold text-xs">
+                {selectedLevel?.level_code}
+              </span>
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-900">선택된 난이도</h3>
+              <p className="text-gray-600">
+                {selectedLevel?.name} - {selectedLevel?.description}
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* 학습 목표 */}
@@ -341,16 +376,8 @@ export default function Home() {
           <>
             {renderProgressBar()}
 
-            {currentStep === "level" && (
-              <LevelSelector
-                onLevelSelect={handleLevelSelect}
-                selectedLevel={selectedLevel}
-              />
-            )}
-
-            {currentStep === "topic" && selectedLevel && (
+            {currentStep === "topic" && (
               <TopicSelector
-                selectedLevel={selectedLevel}
                 onTopicSelect={handleTopicSelect}
                 onSubTopicSelect={handleSubTopicSelect}
                 selectedTopic={selectedTopic}
@@ -358,16 +385,33 @@ export default function Home() {
               />
             )}
 
+            {currentStep === "learning-path" && selectedSubTopic && (
+              <LearningPathSelector
+                selectedSubTopic={selectedSubTopic}
+                onLearningPathSelect={handleLearningPathSelect}
+                selectedLearningPath={selectedLearningPath}
+              />
+            )}
+
+            {currentStep === "level" && (
+              <LevelSelector
+                onLevelSelect={handleLevelSelect}
+                selectedLevel={selectedLevel}
+              />
+            )}
+
             {currentStep === "summary" && renderSummaryStep()}
 
             {/* 네비게이션 버튼 */}
-            {(currentStep === "level" || currentStep === "topic") && (
+            {(currentStep === "topic" || currentStep === "learning-path" || currentStep === "level") && (
               <div className="flex justify-between mt-8">
                 <button
                   onClick={() => {
-                    if (currentStep === "topic") {
-                      setCurrentStep("level");
-                    } else if (currentStep === "level") {
+                    if (currentStep === "level") {
+                      setCurrentStep("learning-path");
+                    } else if (currentStep === "learning-path") {
+                      setCurrentStep("topic");
+                    } else if (currentStep === "topic") {
                       setCurrentStep("welcome");
                     }
                   }}
@@ -376,15 +420,32 @@ export default function Home() {
                   이전 단계
                 </button>
 
-                {currentStep === "topic" &&
-                  (selectedTopic || selectedSubTopic) && (
-                    <button
-                      onClick={() => setCurrentStep("summary")}
-                      className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                    >
-                      선택 완료
-                    </button>
-                  )}
+                {currentStep === "topic" && selectedSubTopic && (
+                  <button
+                    onClick={() => setCurrentStep("learning-path")}
+                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    다음 단계
+                  </button>
+                )}
+
+                {currentStep === "learning-path" && selectedLearningPath && (
+                  <button
+                    onClick={() => setCurrentStep("level")}
+                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    다음 단계
+                  </button>
+                )}
+
+                {currentStep === "level" && selectedLevel && (
+                  <button
+                    onClick={() => setCurrentStep("summary")}
+                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    선택 완료
+                  </button>
+                )}
               </div>
             )}
           </>

@@ -1,68 +1,126 @@
-// OpenAPI 스펙 기반 타입 정의
+// OpenAPI 스키마에 기반한 타입 정의
 
-// 공통 응답 타입
-export interface PaginatedResponse<T = any> {
-  items: T[];
-  total: number;
-  page: number;
-  size: number;
-  pages: number;
-  has_next: boolean;
-  has_prev: boolean;
-}
-
-// 난이도 관련 타입
-export interface LevelResponse {
-  id: number;
-  code: string;
+// 기본 응답 타입들
+export interface MainTopicResponse {
+  main_topic_id: number;
   name: string;
   description: string;
-  target_audience: string;
-  characteristics: string[];
-  estimated_hours_per_week: number;
-  order: number;
 }
 
-export interface LevelWithStats extends LevelResponse {
-  main_topics_count: number;
-  curated_sub_topics_count: number;
+export interface SubTopicResponse {
+  sub_topic_id: number;
+  name: string;
+  description: string;
+  source_type: string;
 }
 
-// 대주제 관련 타입
-export interface MainTopicResponse {
-  id: number;
+export interface LearningPathListResponse {
+  path_id: string;
   title: string;
-  description?: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
+  description: string;
+  curriculum_count: number;
+  estimated_hours: number;
 }
 
-export interface MainTopicWithStats extends MainTopicResponse {
-  curated_sub_topics_count: number;
-}
-
-// 소주제 관련 타입
-export interface CuratedSubTopicWithRelations {
-  id: number;
+export interface LearningPathDetailResponse {
+  path_id: string;
   title: string;
-  description?: string;
-  main_topic_id: number;
-  level_id: number;
-  keywords?: string[];
-  learning_objectives?: string[];
-  prerequisites?: string[];
-  estimated_duration_minutes?: number;
-  difficulty_score?: number;
-  popularity_score: number;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-  level: LevelResponse;
-  main_topic: MainTopicResponse;
+  description: string;
+  curriculum_items: CurriculumItemResponse[];
 }
 
-// API 에러 타입
+export interface CurriculumItemResponse {
+  curriculum_item_id: string;
+  title: string;
+  sort_order: number;
+  has_articles?: boolean;
+}
+
+export interface LevelResponse {
+  level_code: string;
+  name: string;
+  description: string;
+}
+
+export interface ArticleListResponse {
+  article_id: string;
+  level_code: string;
+  title: string;
+  preview: string;
+}
+
+export interface ArticleDetailResponse {
+  article_id: string;
+  title: string;
+  body: string;
+  level_code: string;
+  curriculum_item_id: string;
+  is_read?: boolean | null;
+}
+
+export interface ArticleNavigationResponse {
+  article_id: string;
+  title: string;
+  curriculum_item_id: string;
+  level_code: string;
+}
+
+export interface ReadResponse {
+  article_id: string;
+  read_at: string;
+}
+
+export interface ProgressResponse {
+  total_articles: number;
+  read_articles: number;
+  progress_percentage: number;
+  current_article?: CurrentArticleResponse | null;
+}
+
+export interface CurrentArticleResponse {
+  article_id: string;
+  title: string;
+}
+
+// 요청 타입들
+export interface GenerateSubTopicRequest {
+  topic_hint: string;
+}
+
+export interface GenerateSubTopicResponse {
+  sub_topic_id: number;
+  name: string;
+  description: string;
+  source_type: string;
+}
+
+export interface GenerateLearningPathRequest {
+  learning_objective: string;
+  difficulty: string;
+  item_count: number;
+}
+
+export interface GenerateLearningPathResponse {
+  path_id: string;
+  title: string;
+  curriculum_items: CurriculumItemResponse[];
+}
+
+export interface GenerateArticleRequest {
+  level: string;
+  content_style: string;
+  word_count: number;
+}
+
+export interface GenerateArticleResponse {
+  article_id: string;
+  title: string;
+  body: string;
+  level_code: string;
+  curriculum_item_id: string;
+}
+
+// 에러 타입들
 export interface HTTPValidationError {
   detail: ValidationError[];
 }
@@ -71,32 +129,4 @@ export interface ValidationError {
   loc: (string | number)[];
   msg: string;
   type: string;
-}
-
-// 요청 파라미터 타입들
-export interface GetMainTopicsParams {
-  page?: number;
-  size?: number;
-  is_active?: boolean;
-  search?: string;
-}
-
-export interface GetCuratedSubTopicsParams {
-  page?: number;
-  size?: number;
-  level_id?: number;
-  main_topic_id?: number;
-  is_active?: boolean;
-  search?: string;
-  order_by?: string;
-}
-
-export interface GetCuratedSubTopicsByLevelParams {
-  is_active?: boolean;
-  limit?: number;
-}
-
-export interface GetCuratedSubTopicsByMainTopicParams {
-  is_active?: boolean;
-  order_by?: string;
 }
